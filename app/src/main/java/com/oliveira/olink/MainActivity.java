@@ -43,8 +43,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class MainActivity extends Activity {
-    private static final String PREFS = "olink_settings";
-    private static final String KEY_API = "youtube_api_key";
     private static final int GREEN = Color.rgb(35, 107, 69);
     private static final int DARK = Color.rgb(27, 48, 38);
     private static final int MUTED = Color.rgb(98, 108, 102);
@@ -52,7 +50,6 @@ public class MainActivity extends Activity {
 
     private final ExecutorService executor = Executors.newFixedThreadPool(4);
     private final List<VideoItem> currentItems = new ArrayList<>();
-    private SharedPreferences prefs;
     private EditText searchInput;
     private LinearLayout resultsContainer;
     private TextView statusText;
@@ -65,15 +62,10 @@ public class MainActivity extends Activity {
     @Override
     public void onCreate(Bundle state) {
         super.onCreate(state);
-        prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
         getWindow().setStatusBarColor(Color.rgb(23, 69, 46));
         getWindow().setNavigationBarColor(Color.rgb(23, 69, 46));
         buildScreen();
-        if (prefs.getString(KEY_API, "").trim().isEmpty()) {
-            statusText.setText("Para pesquisar, toque em “Configurar API” e informe sua chave do YouTube Data API v3.");
-        } else {
-            statusText.setText("Pesquise um artista ou uma música.");
-        }
+        statusText.setText("Pesquise um artista ou uma música.");
     }
 
     private void buildScreen() {
@@ -104,10 +96,6 @@ public class MainActivity extends Activity {
         titles.addView(subtitle);
         header.addView(titles, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
 
-        Button apiButton = button("Configurar API", GREEN);
-        apiButton.setTextSize(12);
-        header.addView(apiButton, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(44)));
-        apiButton.setOnClickListener(v -> showApiDialog());
         root.addView(header);
 
         TextView hint = new TextView(this);
@@ -172,51 +160,9 @@ public class MainActivity extends Activity {
         setContentView(page);
     }
 
-    private void showApiDialog() {
-        EditText keyInput = new EditText(this);
-        keyInput.setSingleLine(true);
-        keyInput.setHint("Cole sua chave da API");
-        keyInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD);
-        keyInput.setText(prefs.getString(KEY_API, ""));
-        keyInput.setSelectAllOnFocus(true);
-
-        LinearLayout box = new LinearLayout(this);
-        box.setOrientation(LinearLayout.VERTICAL);
-        box.setPadding(dp(20), dp(8), dp(20), 0);
-        TextView explanation = new TextView(this);
-        explanation.setText("Crie uma chave no Google Cloud e ative “YouTube Data API v3”. A chave fica salva somente neste aparelho e não é incluída no código do GitHub.");
-        explanation.setTextColor(DARK);
-        explanation.setTextSize(14);
-        box.addView(explanation);
-        box.addView(keyInput);
-
-        new AlertDialog.Builder(this)
-            .setTitle("Configurar API do YouTube")
-            .setView(box)
-            .setPositiveButton("Salvar", (dialog, which) -> {
-                String key = keyInput.getText().toString().trim();
-                prefs.edit().putString(KEY_API, key).apply();
-                statusText.setText(key.isEmpty()
-                    ? "Chave removida. Configure a API para pesquisar."
-                    : "Chave salva neste aparelho. Agora você pode pesquisar.");
-                Toast.makeText(this, key.isEmpty() ? "Chave removida" : "Configuração salva", Toast.LENGTH_SHORT).show();
-            })
-            .setNeutralButton("Abrir Google Cloud", (dialog, which) -> {
-                Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse("https://console.cloud.google.com/apis/library/youtube.googleapis.com"));
-                startActivity(intent);
-            })
-            .setNegativeButton("Cancelar", null)
-            .show();
-    }
-
     private void startSearch(boolean nextPage) {
         String query = searchInput.getText().toString().trim();
-        String apiKey = prefs.getString(KEY_API, "").trim();
 
-        if (apiKey.isEmpty()) {
-            showApiDialog();
-            return;
-        }
         if (!nextPage && query.isEmpty()) {
             searchInput.setError("Digite um artista ou uma música");
             return;
@@ -224,7 +170,7 @@ public class MainActivity extends Activity {
         if (loading) return;
         if (!nextPage) {
             lastQuery = query;
-            nextPageToken = "";
+            nextPageToken = "1";
             currentItems.clear();
             resultsContainer.removeAllViews();
             moreButton.setVisibility(View.GONE);
@@ -234,81 +180,123 @@ public class MainActivity extends Activity {
 
         loading = true;
         progress.setVisibility(View.VISIBLE);
-        statusText.setText("Pesquisando no YouTube…");
+        statusText.setText("Pesquisando vídeos...");
         moreButton.setEnabled(false);
 
-        final String requestQuery = nextPage ? lastQuery : query;
-        final String pageToken = nextPage ? nextPageToken : "";
+        final String requestQuery = lastQuery;
+        final int page = Integer.parseInt(nextPageToken);
         executor.execute(() -> {
             try {
-                String urlText = "https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=20&q="
-                    + URLEncoder.encode(requestQuery, "UTF-8")
-                    + "&key=" + URLEncoder.encode(apiKey, "UTF-8");
-                if (!pageToken.isEmpty()) urlText += "&pageToken=" + URLEncoder.encode(pageToken, "UTF-8");
-                HttpURLConnection connection = (HttpURLConnection) new URL(urlText).openConnection();
-                connection.setRequestMethod("GET");
-                connection.setConnectTimeout(15000);
-                connection.setReadTimeout(20000);
-                int code = connection.getResponseCode();
-                InputStream stream = code >= 200 && code < 300 ? connection.getInputStream() : connection.getErrorStream();
-                String response = readAll(stream);
-                connection.disconnect();
+                String[] instances = {
+                    "https://inv.nadeko.net",
+                    "https://yewtu.be",
+                    "https://invidious.nerdvpn.de"
+                };
 
-                if (code < 200 || code >= 300) {
-                    String message = "Erro HTTP " + code;
+                List<VideoItem> found = null;
+                Exception lastError = null;
+
+                for (String instance : instances) {
+                    HttpURLConnection connection = null;
                     try {
-                        JSONObject err = new JSONObject(response).optJSONObject("error");
-                        if (err != null) message = err.optString("message", message);
-                    } catch (Exception ignored) {}
-                    throw new Exception(message);
-                }
+                        String urlText = instance + "/api/v1/search?q="
+                            + URLEncoder.encode(requestQuery, "UTF-8")
+                            + "&type=video&page=" + page
+                            + "&region=BR";
 
-                JSONObject json = new JSONObject(response);
-                String newToken = json.optString("nextPageToken", "");
-                JSONArray items = json.optJSONArray("items");
-                List<VideoItem> found = new ArrayList<>();
-                if (items != null) {
-                    for (int i = 0; i < items.length(); i++) {
-                        JSONObject item = items.optJSONObject(i);
-                        if (item == null) continue;
-                        JSONObject id = item.optJSONObject("id");
-                        JSONObject snippet = item.optJSONObject("snippet");
-                        if (id == null || snippet == null) continue;
-                        String videoId = id.optString("videoId", "");
-                        if (videoId.isEmpty()) continue;
-                        String title = snippet.optString("title", "Vídeo sem título");
-                        String channel = snippet.optString("channelTitle", "Canal desconhecido");
-                        String thumb = "";
-                        JSONObject thumbs = snippet.optJSONObject("thumbnails");
-                        if (thumbs != null) {
-                            JSONObject medium = thumbs.optJSONObject("medium");
-                            JSONObject high = thumbs.optJSONObject("high");
-                            JSONObject def = thumbs.optJSONObject("default");
-                            if (medium != null) thumb = medium.optString("url", "");
-                            if (thumb.isEmpty() && high != null) thumb = high.optString("url", "");
-                            if (thumb.isEmpty() && def != null) thumb = def.optString("url", "");
+                        connection = (HttpURLConnection)
+                            new URL(urlText).openConnection();
+                        connection.setRequestMethod("GET");
+                        connection.setConnectTimeout(10000);
+                        connection.setReadTimeout(15000);
+                        connection.setRequestProperty("User-Agent",
+                            "Mozilla/5.0 Olink Android");
+
+                        int code = connection.getResponseCode();
+                        if (code < 200 || code >= 300) {
+                            throw new Exception("HTTP " + code);
                         }
-                        found.add(new VideoItem(videoId, title, channel, thumb));
+
+                        String response = readAll(connection.getInputStream());
+                        JSONArray items = new JSONArray(response);
+                        List<VideoItem> parsed = new ArrayList<>();
+
+                        for (int i = 0; i < items.length(); i++) {
+                            JSONObject item = items.optJSONObject(i);
+                            if (item == null) continue;
+
+                            String id = item.optString("videoId", "");
+                            if (id.isEmpty()) continue;
+
+                            String title = item.optString(
+                                "title", "Vídeo sem título");
+                            String channel = item.optString(
+                                "author", "Canal desconhecido");
+                            String thumb = "";
+                            JSONArray thumbnails =
+                                item.optJSONArray("videoThumbnails");
+
+                            if (thumbnails != null) {
+                                for (int j = 0; j < thumbnails.length(); j++) {
+                                    JSONObject image =
+                                        thumbnails.optJSONObject(j);
+                                    if (image == null) continue;
+                                    String candidate =
+                                        image.optString("url", "");
+                                    if (!candidate.isEmpty()) {
+                                        thumb = candidate;
+                                        break;
+                                    }
+                                }
+                            }
+
+                            parsed.add(new VideoItem(id, title, channel, thumb));
+                        }
+
+                        found = parsed;
+                        break;
+                    } catch (Exception ex) {
+                        lastError = ex;
+                    } finally {
+                        if (connection != null) connection.disconnect();
                     }
                 }
-                final String tokenResult = newToken;
+
+                if (found == null) {
+                    throw new Exception(
+                        "Os serviços de busca estão indisponíveis. Tente novamente."
+                        + (lastError == null ? "" : " (" +
+                            lastError.getMessage() + ")"));
+                }
+
                 final List<VideoItem> result = found;
+                final String tokenResult =
+                    result.size() >= 20 ? String.valueOf(page + 1) : "";
+
                 runOnUiThread(() -> {
                     nextPageToken = tokenResult;
                     currentItems.addAll(result);
                     for (VideoItem item : result) addResultCard(item);
+
                     if (currentItems.isEmpty()) {
-                        statusText.setText("Nenhum vídeo encontrado. Tente outro nome.");
+                        statusText.setText(
+                            "Nenhum vídeo encontrado. Tente outro nome.");
                     } else {
-                        statusText.setText("Encontrados " + currentItems.size() + " vídeos nesta lista.");
+                        statusText.setText(
+                            "Encontrados " + currentItems.size()
+                            + " vídeos nesta lista.");
                     }
-                    moreButton.setVisibility(nextPageToken.isEmpty() ? View.GONE : View.VISIBLE);
+
+                    moreButton.setVisibility(
+                        nextPageToken.isEmpty() ? View.GONE : View.VISIBLE);
                     finishLoading();
                 });
             } catch (Exception e) {
-                String error = e.getMessage() == null ? "Não foi possível concluir a pesquisa." : e.getMessage();
+                String error = e.getMessage() == null
+                    ? "Não foi possível concluir a pesquisa."
+                    : e.getMessage();
                 runOnUiThread(() -> {
-                    statusText.setText("Falha na pesquisa: " + error + "\nConfira a chave, a API ativada e a cota do Google Cloud.");
+                    statusText.setText("Falha na pesquisa: " + error);
                     finishLoading();
                 });
             }
