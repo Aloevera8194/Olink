@@ -188,9 +188,10 @@ public class MainActivity extends Activity {
         executor.execute(() -> {
             try {
                 String[] instances = {
-                    "https://inv.nadeko.net",
                     "https://yewtu.be",
-                    "https://invidious.nerdvpn.de"
+                    "https://inv.nadeko.net",
+                    "https://invidious.nerdvpn.de",
+                    "https://invidious.tiekoetter.com"
                 };
 
                 List<VideoItem> found = null;
