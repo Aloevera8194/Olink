@@ -46,7 +46,7 @@ public class MainActivity extends Activity {
     private static final int GREEN = Color.rgb(35, 107, 69);
     private static final int DARK = Color.rgb(27, 48, 38);
     private static final int MUTED = Color.rgb(98, 108, 102);
-    private static final int BG = Color.rgb(246, 248, 246);
+    private static final int BG = Color.rgb(232, 240, 233);
 
     private final ExecutorService executor = Executors.newFixedThreadPool(4);
     private final List<VideoItem> currentItems = new ArrayList<>();
@@ -113,7 +113,7 @@ public class MainActivity extends Activity {
         searchInput.setHint("Ex.: Roberto Carlos");
         searchInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
         searchInput.setPadding(dp(12), 0, dp(8), 0);
-        searchInput.setBackground(rounded(Color.WHITE, Color.rgb(220, 226, 221), 12));
+        searchInput.setBackground(rounded(Color.rgb(243, 248, 243), Color.rgb(183, 204, 188), 12));
         searchRow.addView(searchInput, new LinearLayout.LayoutParams(0, dp(52), 1));
         Button searchButton = button("Buscar", GREEN);
         LinearLayout.LayoutParams searchButtonParams = new LinearLayout.LayoutParams(dp(96), dp(52));
@@ -314,7 +314,7 @@ public class MainActivity extends Activity {
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
         card.setPadding(dp(10), dp(10), dp(10), dp(10));
-        card.setBackground(rounded(Color.WHITE, Color.rgb(226, 231, 227), 12));
+        card.setBackground(rounded(Color.rgb(243, 248, 243), Color.rgb(198, 215, 201), 12));
         LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         cardParams.bottomMargin = dp(10);
         resultsContainer.addView(card, cardParams);
@@ -323,7 +323,7 @@ public class MainActivity extends Activity {
         top.setOrientation(LinearLayout.HORIZONTAL);
         top.setGravity(Gravity.CENTER_VERTICAL);
         ImageView thumbnail = new ImageView(this);
-        thumbnail.setBackground(rounded(Color.rgb(230, 235, 231), Color.TRANSPARENT, 8));
+        thumbnail.setBackground(rounded(Color.rgb(215, 229, 217), Color.TRANSPARENT, 8));
         thumbnail.setScaleType(ImageView.ScaleType.CENTER_CROP);
         LinearLayout.LayoutParams imageParams = new LinearLayout.LayoutParams(dp(116), dp(78));
         imageParams.rightMargin = dp(10);
@@ -408,7 +408,7 @@ public class MainActivity extends Activity {
     private Button button(String text, int color) {
         Button button = new Button(this);
         button.setText(text);
-        button.setTextColor(Color.WHITE);
+        button.setTextColor(Color.rgb(243, 248, 243));
         button.setTextSize(13);
         button.setAllCaps(false);
         button.setPadding(dp(8), 0, dp(8), 0);

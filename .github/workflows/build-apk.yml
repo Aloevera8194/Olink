@@ -34,6 +34,19 @@ jobs:
         with:
           gradle-version: '8.11.1'
 
+      - name: Configure fixed Olink signing key
+        env:
+          OLINK_KEYSTORE_BASE64: ${{ secrets.OLINK_KEYSTORE_BASE64 }}
+          OLINK_STORE_PASSWORD: ${{ secrets.OLINK_STORE_PASSWORD }}
+          OLINK_KEY_PASSWORD: ${{ secrets.OLINK_KEY_PASSWORD }}
+          OLINK_KEY_ALIAS: ${{ secrets.OLINK_KEY_ALIAS }}
+        run: |
+          echo "$OLINK_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/olink-signing.jks"
+          echo "OLINK_KEYSTORE_PATH=$RUNNER_TEMP/olink-signing.jks" >> "$GITHUB_ENV"
+          echo "OLINK_STORE_PASSWORD=$OLINK_STORE_PASSWORD" >> "$GITHUB_ENV"
+          echo "OLINK_KEY_PASSWORD=$OLINK_KEY_PASSWORD" >> "$GITHUB_ENV"
+          echo "OLINK_KEY_ALIAS=$OLINK_KEY_ALIAS" >> "$GITHUB_ENV"
+
       - name: Build debug APK
         run: gradle assembleDebug
 

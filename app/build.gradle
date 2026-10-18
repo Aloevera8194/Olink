@@ -18,4 +18,21 @@ android {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
     }
+
+    def olinkStorePath = System.getenv("OLINK_KEYSTORE_PATH")
+    if (olinkStorePath != null && !olinkStorePath.isEmpty()) {
+        signingConfigs {
+            olinkFixed {
+                storeFile file(olinkStorePath)
+                storePassword System.getenv("OLINK_STORE_PASSWORD")
+                keyAlias System.getenv("OLINK_KEY_ALIAS")
+                keyPassword System.getenv("OLINK_KEY_PASSWORD")
+            }
+        }
+        buildTypes {
+            debug {
+                signingConfig signingConfigs.olinkFixed
+            }
+        }
+    }
 }
