@@ -36,3 +36,8 @@ android {
         }
     }
 }
+
+
+dependencies {
+    implementation 'com.github.teamnewpipe:newpipeextractor:v0.26.5'
+}

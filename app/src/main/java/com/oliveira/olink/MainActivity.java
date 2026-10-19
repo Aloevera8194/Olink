@@ -184,95 +184,18 @@ public class MainActivity extends Activity {
         moreButton.setEnabled(false);
 
         final String requestQuery = lastQuery;
-        final int page = Integer.parseInt(nextPageToken);
+        if (nextPage) return;
         executor.execute(() -> {
             try {
-                String[] instances = {
-                    "https://yewtu.be",
-                    "https://inv.nadeko.net",
-                    "https://invidious.nerdvpn.de",
-                    "https://invidious.tiekoetter.com"
-                };
-
-                List<VideoItem> found = null;
-                Exception lastError = null;
-
-                for (String instance : instances) {
-                    HttpURLConnection connection = null;
-                    try {
-                        String urlText = instance + "/api/v1/search?q="
-                            + URLEncoder.encode(requestQuery, "UTF-8")
-                            + "&type=video&page=" + page
-                            + "&region=BR";
-
-                        connection = (HttpURLConnection)
-                            new URL(urlText).openConnection();
-                        connection.setRequestMethod("GET");
-                        connection.setConnectTimeout(10000);
-                        connection.setReadTimeout(15000);
-                        connection.setRequestProperty("User-Agent",
-                            "Mozilla/5.0 Olink Android");
-
-                        int code = connection.getResponseCode();
-                        if (code < 200 || code >= 300) {
-                            throw new Exception("HTTP " + code);
-                        }
-
-                        String response = readAll(connection.getInputStream());
-                        JSONArray items = new JSONArray(response);
-                        List<VideoItem> parsed = new ArrayList<>();
-
-                        for (int i = 0; i < items.length(); i++) {
-                            JSONObject item = items.optJSONObject(i);
-                            if (item == null) continue;
-
-                            String id = item.optString("videoId", "");
-                            if (id.isEmpty()) continue;
-
-                            String title = item.optString(
-                                "title", "Vídeo sem título");
-                            String channel = item.optString(
-                                "author", "Canal desconhecido");
-                            String thumb = "";
-                            JSONArray thumbnails =
-                                item.optJSONArray("videoThumbnails");
-
-                            if (thumbnails != null) {
-                                for (int j = 0; j < thumbnails.length(); j++) {
-                                    JSONObject image =
-                                        thumbnails.optJSONObject(j);
-                                    if (image == null) continue;
-                                    String candidate =
-                                        image.optString("url", "");
-                                    if (!candidate.isEmpty()) {
-                                        thumb = candidate;
-                                        break;
-                                    }
-                                }
-                            }
-
-                            parsed.add(new VideoItem(id, title, channel, thumb));
-                        }
-
-                        found = parsed;
-                        break;
-                    } catch (Exception ex) {
-                        lastError = ex;
-                    } finally {
-                        if (connection != null) connection.disconnect();
-                    }
-                }
-
-                if (found == null) {
-                    throw new Exception(
-                        "Os serviços de busca estão indisponíveis. Tente novamente."
-                        + (lastError == null ? "" : " (" +
-                            lastError.getMessage() + ")"));
+                List<VideoItem> found = new ArrayList<>();
+                for (NewPipeSearch.Result item : NewPipeSearch.search(requestQuery)) {
+                    found.add(new VideoItem(
+                        item.id, item.title, item.channel, item.thumbnail
+                    ));
                 }
 
                 final List<VideoItem> result = found;
-                final String tokenResult =
-                    result.size() >= 20 ? String.valueOf(page + 1) : "";
+                final String tokenResult = "";
 
                 runOnUiThread(() -> {
                     nextPageToken = tokenResult;
